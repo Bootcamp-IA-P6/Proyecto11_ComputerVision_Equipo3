@@ -1,0 +1,33 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+dist/
+
+# Datos y modelos (demasiado grandes para Git)
+data/raw/*
+data/processed/*
+data/augmented/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/augmented/.gitkeep
+*.pt
+*.weights
+*.onnx
+
+# Entorno
+.env
+*.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Reports generados
+reports/sample_outputs/*
+!reports/sample_outputs/.gitkeep
