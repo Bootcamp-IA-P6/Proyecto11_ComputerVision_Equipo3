@@ -24,6 +24,7 @@ The AI model will send a single JSON payload for each analyzed video using the f
       "start_time": "float",
       "end_time": "float",
       "confidence": "float",
+      "bounding_box": ["float", "float", "float", "float"],
       "crop_path": "string"
     }
   ]
@@ -43,6 +44,7 @@ The AI model will send a single JSON payload for each analyzed video using the f
 * `start_time` (Float): The exact timestamp in seconds where the logo appearance begins.
 * `end_time` (Float): The exact timestamp in seconds where the logo appearance ends.
 * `confidence` (Float): The model's certainty score for the detection, bounded between `0.0` and `1.0`.
+* `bounding_box` (Array of Floats): The spatial coordinates of the detection box formatted as `[xmin, ymin, xmax, ymax]` to allow bounding box rendering over the video.
 * `crop_path` (String): The local storage path of the physical cropped image file (e.g., `"data/processed/coca_cola_crop_001.jpg"`).
 
 ---
