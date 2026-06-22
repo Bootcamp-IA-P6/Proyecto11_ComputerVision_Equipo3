@@ -14,7 +14,7 @@ for split in ["train", "valid", "test"]:
     lbl_path = os.path.join(DATASET_PATH, split, "labels")
 
     if not os.path.exists(img_path):
-        print(f"⚠️uv add pyyaml  {split}: carpeta de imágenes no encontrada")
+        print(f"⚠️  {split}: carpeta de imágenes no encontrada")
         continue
 
     imagenes = len(os.listdir(img_path))

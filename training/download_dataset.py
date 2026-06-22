@@ -30,7 +30,7 @@ output_dir.mkdir(parents=True, exist_ok=True)
 
 rf = Roboflow(api_key=api_key)
 project = rf.workspace("dimitar-dimitrov-qnnci").project("logo-detection-clean")
-dataset = project.version(1).download("yolo26", location=str(output_dir), overwrite=True)
+dataset = project.version(3).download("yolo26", location=str(output_dir), overwrite=True)
 
 print(f"Dataset descargado en: {dataset.location}")
 
