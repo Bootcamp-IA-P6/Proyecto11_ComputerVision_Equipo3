@@ -26,6 +26,7 @@
 - Class imbalance ratio: 1.8x ✅
 - Small boxes (<2% image): 14,947 — normal for real-world logo detection
 - Large boxes (>50% image): 49 — negligible
+- Duplicate images: 0 ✅
 
 ## Notes
 - Dataset already annotated in YOLOv8 format
