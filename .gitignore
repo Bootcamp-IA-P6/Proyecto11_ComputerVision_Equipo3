@@ -31,3 +31,5 @@ Thumbs.db
 # Reports generados
 reports/sample_outputs/*
 !reports/sample_outputs/.gitkeep
+
+services/backend/app/storage/crops/*.jpg
