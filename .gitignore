@@ -35,6 +35,5 @@ reports/sample_outputs/*
 services/backend/app/storage/crops/*.jpg
 
 
-# Artefactos generados por Ultralytics
-models/logo-detection-v1-2/
-models/logo-detection-medium/
+# Pesos de entrenamiento (gráficas y métricas sí se versionan)
+models/**/weights/
