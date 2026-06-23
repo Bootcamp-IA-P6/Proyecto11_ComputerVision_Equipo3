@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Dict, Any
-from app.db.connection import get_db  # Assuming this dependency provides the session
+from app.db.connection import get_db
 from app.db import crud
 
 router = APIRouter(
@@ -27,12 +27,13 @@ def get_video_report(video_id: int, db: Session = Depends(get_db)):
         )
         
     # Serialize the relational database models manually into the required JSON schema response
+    # Corrected using explicit database model properties: video_id, video_name, brand_name
     return {
-        "video_id": video_record.id,
-        "video_name": video_record.name,
+        "video_id": video_record.video_id,
+        "video_name": video_record.video_name,
         "detections": [
             {
-                "brand_name": detection.brand.name,
+                "brand_name": detection.brand.brand_name,
                 "start_time": detection.start_time,
                 "end_time": detection.end_time,
                 "confidence": detection.confidence,
