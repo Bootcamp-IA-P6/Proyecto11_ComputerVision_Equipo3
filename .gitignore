@@ -33,3 +33,8 @@ reports/sample_outputs/*
 !reports/sample_outputs/.gitkeep
 
 services/backend/app/storage/crops/*.jpg
+
+
+# Artefactos generados por Ultralytics
+models/logo-detection-v1-2/
+models/logo-detection-medium/
