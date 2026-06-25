@@ -16,16 +16,20 @@ import BrandChart from '../components/BrandChart'
 import BrandTimeline from '../components/BrandTimeline'
 import DetectionsTable from '../components/DetectionsTable'
 import KpiCard from '../components/KpiCard'
-import { getVideoReport } from '../services/api'
+import VideoPlayerWithDetections from '../components/VideoPlayerWithDetections'
+import { getVideoReport, getHistoryItem } from '../services/api'
 import { buildReport } from '../utils/report'
 
 export default function ReportPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { videoId, videoName, detections: initialDetections } = location.state || {}
+  const { videoId, videoName, detections: initialDetections, videoFile, frame_detections: initialFrameDetections } =
+    location.state || {}
 
   const [report, setReport] = useState(null)
-  const [loading, setLoading] = useState(!initialDetections)
+  const [videoUrl, setVideoUrl] = useState(null)
+  const [frameDetections, setFrameDetections] = useState(initialFrameDetections || [])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [exported, setExported] = useState(false)
 
@@ -37,6 +41,17 @@ export default function ReportPage() {
 
     if (initialDetections?.length > 0) {
       setReport(buildReport(videoId, videoName, initialDetections))
+      if (initialFrameDetections?.length) setFrameDetections(initialFrameDetections)
+      setLoading(false)
+      return
+    }
+
+    const cached = getHistoryItem(videoId)
+    if (cached?.detections?.length > 0) {
+      setReport(
+        buildReport(videoId, cached.video_name || videoName, cached.detections, cached.duration_seconds)
+      )
+      if (cached.frame_detections?.length) setFrameDetections(cached.frame_detections)
       setLoading(false)
       return
     }
@@ -44,7 +59,9 @@ export default function ReportPage() {
     const fetchReport = async () => {
       try {
         const data = await getVideoReport(videoId)
-        setReport(buildReport(data.video_id, data.video_name, data.detections))
+        setReport(
+          buildReport(data.video_id, data.video_name, data.detections, data.duration_seconds)
+        )
       } catch (err) {
         setError(err.message || 'Error al cargar el informe')
       } finally {
@@ -53,7 +70,15 @@ export default function ReportPage() {
     }
 
     fetchReport()
-  }, [videoId, videoName, initialDetections, navigate])
+  }, [videoId, videoName, initialDetections, initialFrameDetections, navigate])
+
+  useEffect(() => {
+    if (!(videoFile instanceof File)) return undefined
+
+    const url = URL.createObjectURL(videoFile)
+    setVideoUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [videoFile])
 
   const handleExport = () => {
     if (!report) return
@@ -153,6 +178,23 @@ export default function ReportPage() {
           </button>
         </div>
       </div>
+
+      {videoUrl ? (
+        <VideoPlayerWithDetections
+          videoUrl={videoUrl}
+          frameDetections={frameDetections}
+          intervals={report.detections}
+        />
+      ) : videoFile instanceof File ? (
+        <div className="card-minimal flex items-center justify-center gap-3 py-12 text-slate-500">
+          <Loader2 className="w-5 h-5 animate-spin text-brand-green" />
+          Preparando reproducción del vídeo...
+        </div>
+      ) : frameDetections.length > 0 ? (
+        <p className="text-sm text-slate-500 card-minimal px-4 py-3">
+          El vídeo no está disponible en esta sesión (historial). Vuelve a subirlo para ver la reproducción con detecciones en vivo.
+        </p>
+      ) : null}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

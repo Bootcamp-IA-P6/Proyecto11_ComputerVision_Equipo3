@@ -36,14 +36,15 @@ export function calculateTotalDuration(detections) {
   return Math.max(...detections.map((d) => d.end_time || 0))
 }
 
-export function buildReport(videoId, videoName, detections) {
+export function buildReport(videoId, videoName, detections, durationSeconds) {
   const brands = processDetections(detections || [])
+  const computed = calculateTotalDuration(detections)
   return {
     video_id: videoId,
     video_name: videoName,
     brands,
     detections: detections || [],
-    total_duration: calculateTotalDuration(detections),
+    total_duration: durationSeconds ?? computed,
     avg_confidence:
       detections?.length > 0
         ? detections.reduce((a, d) => a + (d.confidence || 0), 0) / detections.length

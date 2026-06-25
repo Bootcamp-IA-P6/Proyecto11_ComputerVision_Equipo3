@@ -1,94 +1,123 @@
-/**
- * Servicio de API - Todas las llamadas a la API FastAPI centralizadas aquí
- * 
- * Base URL configurable mediante variable de entorno VITE_API_URL
- * Fallback a localhost:8000 para desarrollo local
- */
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+function intervalsToDetections(intervals = []) {
+  return intervals.map((item) => ({
+    brand_name: item.brand_name,
+    start_time: item.start_time,
+    end_time: item.end_time,
+    confidence: item.avg_confidence ?? item.confidence ?? 0,
+    crop_path: item.crop_path ?? null,
+    bounding_box: item.bounding_box ?? null,
+  }))
+}
 
-/**
- * Sube un archivo de vídeo para análisis de detección de logos
- * @param {File} file - Archivo de vídeo .mp4
- * @returns {Promise<Object>} - Respuesta con video_id y detecciones
- */
+export function normalizeVideoResponse(data) {
+  const detections =
+    data.detections?.length > 0
+      ? data.detections
+      : intervalsToDetections(data.intervals)
+
+  return {
+    video_id: data.video_id,
+    video_name: data.video_name ?? data.filename,
+    duration_seconds: data.duration_seconds,
+    frames_analyzed: data.frames_analyzed,
+    processing_time_s: data.processing_time_s,
+    total_brands: data.total_brands ?? detections.length,
+    detections,
+    frame_detections: data.frame_detections ?? [],
+  }
+}
+
+async function parseError(response) {
+  const error = await response.json().catch(() => ({}))
+  const detail = error.detail
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map((d) => d.msg).join(', ')
+  return `Error ${response.status}: ${response.statusText}`
+}
+
+export async function checkApiHealth() {
+  const response = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(4000) })
+  if (!response.ok) throw new Error('API no disponible')
+  return response.json()
+}
+
 export async function uploadVideo(file) {
-  const formData = new FormData();
-  formData.append("file", file);
+  const formData = new FormData()
+  formData.append('file', file)
 
   const response = await fetch(`${API_URL}/detect/video`, {
-    method: "POST",
+    method: 'POST',
     body: formData,
-  });
+  })
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `Error ${response.status}: ${response.statusText}`);
-  }
-
-  return response.json();
+  if (!response.ok) throw new Error(await parseError(response))
+  return normalizeVideoResponse(await response.json())
 }
 
-/**
- * Obtiene el informe completo de un vídeo procesado
- * @param {number|string} videoId - ID del vídeo
- * @returns {Promise<Object>} - Informe con detecciones y estadísticas
- */
+export async function uploadImage(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`${API_URL}/detect/image`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) throw new Error(await parseError(response))
+  return response.json()
+}
+
 export async function getVideoReport(videoId) {
-  const response = await fetch(`${API_URL}/videos/${videoId}/report`);
+  const response = await fetch(`${API_URL}/videos/${videoId}/report`)
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail || `Error ${response.status}: ${response.statusText}`);
+  if (!response.ok) throw new Error(await parseError(response))
+  return normalizeVideoResponse(await response.json())
+}
+
+export function getCropImageUrl(cropPath) {
+  if (!cropPath) return null
+  if (cropPath.startsWith('http')) return cropPath
+  const path = cropPath.startsWith('/') ? cropPath.slice(1) : cropPath
+  return `${API_URL}/${path}`
+}
+
+const HISTORY_KEY = 'logoDetectionHistory'
+
+export function saveToHistory(videoData) {
+  const history = getHistory()
+  const { frame_detections: _frames, ...rest } = videoData
+  const entry = {
+    ...rest,
+    timestamp: videoData.timestamp ?? Date.now(),
   }
 
-  return response.json();
+  const idx = history.findIndex((v) => v.video_id === entry.video_id)
+  if (idx >= 0) {
+    history[idx] = { ...history[idx], ...entry }
+  } else {
+    history.unshift(entry)
+  }
+
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)))
 }
 
-/**
- * Obtiene la URL completa para una imagen crop
- * @param {string} cropPath - Ruta relativa del crop (ej: "storage/crops/nike_2.50.jpg")
- * @returns {string} - URL completa
- */
-export function getCropImageUrl(cropPath) {
-  if (!cropPath) return null;
-  // Si ya es una URL completa, devolverla tal cual
-  if (cropPath.startsWith('http')) return cropPath;
-  return `${API_URL}/${cropPath}`;
-}
-
-/**
- * Guarda un vídeo en el historial local (localStorage)
- * @param {Object} videoData - Datos del vídeo {video_id, video_name, timestamp, brandCount}
- */
-export function saveToHistory(videoData) {
-  const history = getHistory();
-  // Evitar duplicados
-  const exists = history.find(v => v.video_id === videoData.video_id);
-  if (exists) return;
-  
-  history.unshift(videoData);
-  // Mantener solo los últimos 50 vídeos
-  const trimmed = history.slice(0, 50);
-  localStorage.setItem('logoDetectionHistory', JSON.stringify(trimmed));
-}
-
-/**
- * Obtiene el historial de vídeos procesados desde localStorage
- * @returns {Array} - Lista de vídeos procesados
- */
 export function getHistory() {
   try {
-    const stored = localStorage.getItem('logoDetectionHistory');
-    return stored ? JSON.parse(stored) : [];
+    const stored = localStorage.getItem(HISTORY_KEY)
+    return stored ? JSON.parse(stored) : []
   } catch {
-    return [];
+    return []
   }
 }
 
-/**
- * Limpia todo el historial de vídeos
- */
-export function clearHistory() {
-  localStorage.removeItem('logoDetectionHistory');
+export function getHistoryItem(videoId) {
+  return getHistory().find((v) => String(v.video_id) === String(videoId))
 }
+
+export function clearHistory() {
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+export { API_URL }

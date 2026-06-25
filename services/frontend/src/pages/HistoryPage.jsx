@@ -21,6 +21,8 @@ export default function HistoryPage() {
         state: {
           videoId: video.video_id,
           videoName: video.video_name,
+          detections: video.detections || [],
+          duration_seconds: video.duration_seconds,
         },
       })
     },
