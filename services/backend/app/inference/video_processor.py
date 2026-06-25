@@ -120,6 +120,14 @@ def process_video(video_path: str, sample_fps: int = 2, gap_tolerance: float = 1
 
     intervals = aggregate_detections(frames_detections, gap_tolerance)
 
+    frame_detections = [
+        {
+            "timestamp": round(timestamp, 2),
+            "detections": detections,
+        }
+        for timestamp, detections in frames_detections
+    ]
+
     elapsed = time.time() - start
 
     return {
@@ -127,5 +135,6 @@ def process_video(video_path: str, sample_fps: int = 2, gap_tolerance: float = 1
         "frames_analyzed":   len(frames),
         "processing_time_s": round(elapsed, 2),
         "intervals":         intervals,
+        "frame_detections":  frame_detections,
         "total_brands":      len(set(i["brand_name"] for i in intervals)),
     }

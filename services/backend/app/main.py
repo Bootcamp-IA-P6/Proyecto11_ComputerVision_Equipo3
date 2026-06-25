@@ -2,15 +2,17 @@
 Backend API for logo detection in images and videos.
 """
 
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from fastapi.responses import JSONResponse
-from PIL import Image
 import io
-import tempfile
 import os
 from contextlib import asynccontextmanager
 
-from app.inference.detector import predict_image, load_model
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from PIL import Image
+
+from app.api.videos import router as videos_router
+from app.inference.detector import load_model, predict_image
 from app.inference.video_processor import process_video
 
 # Define lifespan to load the model securely at startup
@@ -32,9 +34,11 @@ app = FastAPI(
 def root():
     return {"status": "ok", "message": "Logo Detection API running"}
 
+
 @app.get("/health")
 def health():
-    return {"status": "healthy"}
+    return {"status": "healthy", "model": "yolo11s"}
+
 
 @app.post("/detect/image")
 async def detect_image(file: UploadFile = File(...)):
@@ -48,23 +52,25 @@ async def detect_image(file: UploadFile = File(...)):
     detections = predict_image(image)
     
 
-    return JSONResponse(content={
-        "filename":   file.filename,
+    return {
+        "filename": file.filename,
         "detections": detections,
-        "total":      len(detections)
-    })
+        "total": len(detections),
+    }
+
 
 @app.post("/detect/video")
 async def detect_video(
     file: UploadFile = File(...),
     sample_fps: int = 2,
-    gap_tolerance: float = 1.0
+    gap_tolerance: float = 1.0,
 ):
     # Validate video format
     if not file.filename.endswith((".mp4", ".avi", ".mov", ".mkv")):
         raise HTTPException(status_code=400, detail="Unsupported video format")
 
     contents = await file.read()
+    suffix = Path(file.filename).suffix or ".mp4"
 
     # Save to a temporary file for processing
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
@@ -78,10 +84,18 @@ async def detect_video(
         # Ensure temporary file is cleaned up
         os.unlink(tmp_path)
 
-    return JSONResponse(content={
-        "filename":          file.filename,
-        "duration_seconds":  result["duration_seconds"],
-        "frames_analyzed":   result["frames_analyzed"],
+    detections = intervals_to_detections(result["intervals"])
+    unique_name = f"{file.filename}_{int(time.time())}"
+    video_id = persist_video_analysis(unique_name, result["duration_seconds"], detections)
+
+    if video_id is None:
+        video_id = str(uuid.uuid4())[:8]
+
+    return {
+        "video_id": video_id,
+        "video_name": file.filename,
+        "duration_seconds": result["duration_seconds"],
+        "frames_analyzed": result["frames_analyzed"],
         "processing_time_s": result["processing_time_s"],
         "total_brands":      result["total_brands"],
         "intervals":         result["intervals"],
