@@ -39,3 +39,7 @@ services/backend/app/storage/crops/*.jpg
 models/**/weights/
 models/**/args.yaml
 test_output.jpg
+*.avi
+*.mov
+*.mkv
+*.mp4
