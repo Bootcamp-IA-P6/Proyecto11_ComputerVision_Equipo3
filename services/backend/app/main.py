@@ -1,14 +1,10 @@
 """
-Backend API para detección de logos en imágenes y vídeos.
+Backend API for logo detection in images and videos.
 """
 
 import io
 import os
-import tempfile
-import time
-import uuid
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,84 +15,20 @@ from app.api.videos import router as videos_router
 from app.inference.detector import load_model, predict_image
 from app.inference.video_processor import process_video
 
-STORAGE_DIR = Path(__file__).resolve().parent / "storage"
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-
-
+# Define lifespan to load the model securely at startup
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Logic to execute when the server starts
     load_model()
     yield
-
+    # Logic to execute when the server shuts down (if needed)
 
 app = FastAPI(
     title="Logo Detection API",
-    description="Detecta logos de marcas en imágenes y vídeos usando YOLO11s",
-    version="2.1.0",
-    lifespan=lifespan,
+    description="Detects brand logos in images and videos using YOLO11s",
+    version="2.0.0",
+    lifespan=lifespan  # Pass the lifespan context manager here
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.mount("/storage", StaticFiles(directory=str(STORAGE_DIR)), name="storage")
-app.include_router(videos_router)
-
-
-def intervals_to_detections(intervals: list) -> list:
-    return [
-        {
-            "brand_name": item["brand_name"],
-            "start_time": item["start_time"],
-            "end_time": item["end_time"],
-            "confidence": item.get("avg_confidence", item.get("confidence", 0)),
-            "crop_path": item.get("crop_path"),
-            "bounding_box": item.get("bounding_box", [0, 0, 0, 0]),
-        }
-        for item in intervals
-    ]
-
-
-def persist_video_analysis(video_name: str, duration: float, detections: list) -> int | None:
-    try:
-        from app.db.connection import SessionLocal
-        from app.db import crud
-
-        if SessionLocal is None:
-            return None
-
-        db = SessionLocal()
-        try:
-            video = crud.create_video_record(db, video_name)
-            video.duration_seconds = duration
-            db.commit()
-            db.refresh(video)
-
-            db_detections = [
-                {
-                    "brand_name": d["brand_name"],
-                    "start_time": d["start_time"],
-                    "end_time": d["end_time"],
-                    "confidence": d["confidence"],
-                    "crop_path": d.get("crop_path") or "",
-                    "bounding_box": d.get("bounding_box") or [0, 0, 0, 0],
-                }
-                for d in detections
-            ]
-            if db_detections:
-                crud.save_video_analysis_results(db, video.video_id, db_detections)
-            return video.video_id
-        finally:
-            db.close()
-    except Exception as exc:
-        print(f"Persistencia en BD omitida: {exc}")
-        return None
-
 
 @app.get("/")
 def root():
@@ -110,12 +42,15 @@ def health():
 
 @app.post("/detect/image")
 async def detect_image(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen")
+    # Validate that the file is an image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
 
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
+    
     detections = predict_image(image)
+    
 
     return {
         "filename": file.filename,
@@ -130,19 +65,23 @@ async def detect_video(
     sample_fps: int = 2,
     gap_tolerance: float = 1.0,
 ):
-    if not file.filename or not file.filename.lower().endswith((".mp4", ".avi", ".mov", ".mkv")):
-        raise HTTPException(status_code=400, detail="Formato de vídeo no soportado")
+    # Validate video format
+    if not file.filename.endswith((".mp4", ".avi", ".mov", ".mkv")):
+        raise HTTPException(status_code=400, detail="Unsupported video format")
 
     contents = await file.read()
     suffix = Path(file.filename).suffix or ".mp4"
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    # Save to a temporary file for processing
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(contents)
         tmp_path = tmp.name
 
     try:
+        # Process the video using the processor module
         result = process_video(tmp_path, sample_fps, gap_tolerance)
     finally:
+        # Ensure temporary file is cleaned up
         os.unlink(tmp_path)
 
     detections = intervals_to_detections(result["intervals"])
@@ -158,8 +97,6 @@ async def detect_video(
         "duration_seconds": result["duration_seconds"],
         "frames_analyzed": result["frames_analyzed"],
         "processing_time_s": result["processing_time_s"],
-        "total_brands": result["total_brands"],
-        "detections": detections,
-        "intervals": result["intervals"],
-        "frame_detections": result.get("frame_detections", []),
-    }
+        "total_brands":      result["total_brands"],
+        "intervals":         result["intervals"],
+    })
