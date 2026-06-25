@@ -37,3 +37,4 @@ services/backend/app/storage/crops/*.jpg
 
 # Pesos de entrenamiento (gráficas y métricas sí se versionan)
 models/**/weights/models/**/args.yaml
+test_output.jpg
