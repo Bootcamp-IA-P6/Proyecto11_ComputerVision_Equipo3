@@ -43,3 +43,7 @@ test_output.jpg
 *.mov
 *.mkv
 *.mp4
+
+# Dependencias de Frontend
+services/frontend/node_modules/
+services/frontend/dist/
