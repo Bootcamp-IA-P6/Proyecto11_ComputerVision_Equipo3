@@ -99,4 +99,4 @@ async def detect_video(
         "processing_time_s": result["processing_time_s"],
         "total_brands":      result["total_brands"],
         "intervals":         result["intervals"],
-    })
+    }
