@@ -27,7 +27,36 @@ data/augmented/*
 # Sistema
 .DS_Store
 Thumbs.db
+.vscode/
+
+# Cachés de datasets YOLO
+**/labels.cache
+
+# Caché de Vite (generado por npm run dev)
+**/.vite/
 
 # Reports generados
 reports/sample_outputs/*
 !reports/sample_outputs/.gitkeep
+
+services/backend/app/storage/crops/*.jpg
+
+# Frontend
+node_modules/
+services/frontend/node_modules/
+services/frontend/dist/
+services/frontend/.env
+
+
+# Pesos de entrenamiento (gráficas y métricas sí se versionan)
+models/**/weights/
+models/**/args.yaml
+test_output.jpg
+*.avi
+*.mov
+*.mkv
+*.mp4
+
+# Dependencias de Frontend
+services/frontend/node_modules/
+services/frontend/dist/
